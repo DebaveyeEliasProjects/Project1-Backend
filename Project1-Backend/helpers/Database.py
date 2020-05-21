@@ -3,6 +3,7 @@ from flaskext.mysql import MySQL
 from pymysql.cursors import DictCursor
 
 
+
 class Database:
     def __init__(self, app, user, password, db, host='localhost', port=3306):
         # MySQL configurations
