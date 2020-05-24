@@ -4,9 +4,11 @@ import fcntl
 import time
 import copy
 import string
+from datetime import datetime
 from AtlasI2C import AtlasI2C
 from Repositories.DataRepository import DataRepository
 
+temp_file = "/sys/bus/w1/devices/w1_bus_master1/28-000009083444/w1_slave"
 
 def get_devices():
     device = AtlasI2C()
@@ -38,7 +40,7 @@ def read_sensor(address):
             types = str(output[6]).split(",")
             result = []
             result.append(types[1])
-            result.append(output[7])
+            result.append(output[7].replace("\x00", ""))
             return result
 
 def lights_off(address):
@@ -55,9 +57,24 @@ def lights_on(address):
             device = i
             device.query("L,1");
 
+def read_temperature():
+    sensorfile = open(temp_file, 'r')
+    for i, line in enumerate(sensorfile):
+        if i == 1:  # 2de lijn
+            result = []
+            temp = int(line.strip('\n')[line.find('t=')+2:])/1000.0
+            result.append("Graden ")
+            result.append(temp)
+            return result
+    sensorfile.close()
+
 device_list = get_devices()
 device = device_list[0]
 
-
-lights_on(98)
-lights_on(99)
+while True:
+    datum = datetime.now().replace(microsecond=0)
+    DataRepository.post_new_reading(read_sensor(98),datum,1)
+    DataRepository.post_new_reading(read_sensor(99),datum,2)
+    DataRepository.post_new_reading(read_temperature(),datum,3)
+    DataRepository.post_new_pump_change(1,datum,1)
+    time.sleep(4)

@@ -1,5 +1,5 @@
 # pylint: skip-file
-from repositories.DataRepository import DataRepository
+from sensors.Repositories.DataRepository import DataRepository
 from flask import Flask, jsonify
 from flask_socketio import SocketIO
 from flask_cors import CORS

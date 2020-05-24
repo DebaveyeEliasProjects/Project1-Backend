@@ -25,3 +25,18 @@ class DataRepository:
         sql = "SELECT * FROM aquastats.Pomp;"
         params = []
         return Database.get_one_row(sql,params)
+
+    @staticmethod
+    def post_new_reading(data, date, sensorID):
+        print(data)
+        print(date)
+        print(sensorID)
+        params = [date,data[1],sensorID]
+        sql = "INSERT into aquastats.Meetwaarden (Datum, Waarde, SensorID) VALUES (%s, %s, %s)"
+        Database.execute_sql(sql,params)
+
+    @staticmethod
+    def post_new_pump_change(status, date, pumpID):
+        params = [date,status,pumpID]
+        sql = "INSERT into aquastats.Meetwaarden (Datum, Waarde, PompID) VALUES (%s, %s, %s)"
+        Database.execute_sql(sql,params)
