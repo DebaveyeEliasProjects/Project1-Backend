@@ -1,5 +1,4 @@
-#!/usr/bin/python
-#  https://raspberrytips.nl/lcd-scherm-20x4-i2c-raspberry-pi/
+
 
 import sys
 import smbus
