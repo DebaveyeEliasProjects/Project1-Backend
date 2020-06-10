@@ -3,6 +3,12 @@ from .Database import Database
 class DataRepository:
 
     @staticmethod
+    def readings_by_sensor_and_date(date,sensorID):
+        sql = "SELECT * FROM Meetwaarden as M left join Device as D on M.DeviceID = D.DeviceId where Date(M.Datum) like Date(%s) and M.DeviceID = %s order by M.Datum;"
+        params = [date,sensorID]
+        return Database.get_rows(sql,params)
+
+    @staticmethod
     def read_all_sensors():
         sql = "SELECT * FROM Device"
         params = []
@@ -10,13 +16,13 @@ class DataRepository:
 
     @staticmethod
     def read_all_readings_by_date(date):
-        sql = "SELECT * FROM aquastats.Meetwaarden where date(datum) = %s and DeviceID is not null and Waarde is not null order by Datum;"
+        sql = "SELECT * FROM aquastats.Meetwaarden where date(datum) = %s and DeviceID is not null and Waarde is not null order by Datum desc;"
         params = [date]
         return Database.get_rows(sql,params)
     
     @staticmethod
     def read_all_readings_by_date_limit5(date):
-        sql = "SELECT * FROM Meetwaarden where date(datum) = %s and DeviceID is not null and Waarde is not null order by Datum limit 5;"
+        sql = "SELECT * FROM Meetwaarden where date(datum) = %s and DeviceID is not null and Waarde is not null order by Datum desc limit 5;"
         params = [date]
         return Database.get_rows(sql,params)
 
@@ -40,7 +46,7 @@ class DataRepository:
 
     @staticmethod
     def get_dates():
-        sql = "SELECT distinct Datum from Meetwaarden order by Datum Desc"
+        sql = "SELECT distinct date(Datum) as Datum from Meetwaarden order by Datum Desc"
         return Database.get_rows(sql)
 
     @staticmethod
@@ -51,5 +57,5 @@ class DataRepository:
     @staticmethod
     def get_last_five_readings  (sensorID):
         params = [sensorID]
-        sql = "SELECT * from aquastats.Meetwaarden as M right join aquastats.Device as S on M.DeviceID = S.DeviceID where M.DeviceID = %s and S.Type = 'Sensor' order by Datum Desc limit 5"
+        sql = "SELECT * from aquastats.Meetwaarden as M right join aquastats.Device as S on M.DeviceID = S.DeviceID where M.DeviceID = %s and S.Type = 'Sensor' order by Datum desc limit 5"
         return Database.get_rows(sql, params)

@@ -37,6 +37,24 @@ def read_sensors():
         output = DataRepository.read_all_sensors()
         return jsonify(sensors=output), 200
 
+@app.route(endpoint + "readings/<date>/<id>", methods=['GET'])
+def read_all_readings_for_day(date, id):
+    if request.method == 'GET':
+        print(date)
+        output1 = DataRepository.readings_by_sensor_and_date(date,id)
+        new_out = []
+        for x in output1:
+            d = {
+                "MetingID": x['MeetingID'],
+                "Datum": x['Datum'].strftime("%Y-%m-%d %H:%M:%S"),
+                "Waarde": x['Waarde'],
+                "DeviceID": x["DeviceID"],
+                "Eenheid": x["Eenheid"]
+            }
+            new_out.append(d)
+        return jsonify(readings=new_out), 200
+
+
 @app.route(endpoint + "readings/<date>/<DeviceID>", methods = ['GET'])
 def read_all_values_by_date(date,DeviceID):
     if(request.method == "GET"):
@@ -56,6 +74,8 @@ def read_all_values_by_date_limit5(date,DeviceID):
             if(i['DeviceID']==int(DeviceID)):
                 new_out.append(i)
         return jsonify(readings=new_out), 200
+
+
 
 @app.route(endpoint + "last-five-readings/<DeviceID>", methods = ['GET'])
 def read_last_5_readings(DeviceID):
@@ -77,6 +97,7 @@ def read_last_5_readings(DeviceID):
 def read_pump():
     if request.method == "GET":
         output = DataRepository.get_pump_status()
+        
         return jsonify(pump=output),200
 
 @app.route(endpoint + "dates", methods = ['GET'])
@@ -85,7 +106,7 @@ def read_dates():
         output = DataRepository.get_dates()
         dates = []
         for i in output:
-            t = i['Datum'].strftime("%Y-%m-%d %H:%M:%S")
+            t = i['Datum'].strftime("%Y-%m-%d")
             dates.append(t)
         return jsonify(dates =dates)
 
@@ -103,9 +124,9 @@ def read_5dates():
 
 temp_file = "/sys/bus/w1/devices/w1_bus_master1/28-000009083444/w1_slave"
 GPIO.setmode(GPIO.BCM)
-motorPin = 15
+motorPin = 18
 GPIO.setup(motorPin, GPIO.OUT)
-time_between_readings = 10
+time_between_readings = 60*20
 lcd_addr = 0x27
 
 
@@ -114,7 +135,7 @@ def return_ip():
     ips = check_output(['hostname', '--all-ip-addresses'])
     ips = str(ips)
     ip = ips.strip("b'").split(" ")
-    return ip[0]
+    return ip[1]
 
 def get_devices():
     device = AtlasI2C()
@@ -184,40 +205,83 @@ def clear_lcd():
 device_list = get_devices()
 device = device_list[0]
 
+def send_pump_data(pumpstatus):
+    socketio.emit("B2F_pump_change",{"pump":pumpstatus})
+
+def selc_control():
+    GPIO.output(motorPin,GPIO.LOW)
+    lcd20x4.I2C_ADDR = lcd_addr
+    lcd20x4.lcd_init()
+    clear_lcd()
+
+    send_pump_data(1)
+    
+    datum = datetime.now().replace(microsecond=0)
+    GPIO.output(motorPin,GPIO.HIGH)
+    DataRepository.post_new_pump_change(1,7)
+    dataPh = read_sensor(99)
+    lcd20x4.lcd_string("pH:   " + str(dataPh[1]), lcd20x4.LCD_LINE_2)
+    DataRepository.post_new_reading(dataPh,4)
+    dataOrp = read_sensor(98)
+    lcd20x4.lcd_string("ORP:  " + str(dataOrp[1]), lcd20x4.LCD_LINE_3)
+    DataRepository.post_new_reading(dataOrp,5)
+    dataC = read_temperature()
+    lcd20x4.lcd_string("C:    " + str(dataC[1]), lcd20x4.LCD_LINE_4)
+    DataRepository.post_new_reading(dataC,6)
+    GPIO.output(motorPin,GPIO.LOW)
+    
+    send_pump_data(0)
+
+    DataRepository.post_new_pump_change(0,7)
+    socketio.emit('B2F_self_control', {"ph":dataPh[1],"orp":dataOrp[1],"degrees":dataC[1]})   
+    socketio.emit('B2F_verandering_data', {"ph":dataPh[1],"orp":dataOrp[1],"degrees":dataC[1]}) 
+
+
+def program_code():
+    GPIO.output(motorPin,GPIO.LOW)
+    lcd20x4.I2C_ADDR = lcd_addr
+    lcd20x4.lcd_init()
+    clear_lcd()
+    datum = datetime.now().replace(microsecond=0)
+    GPIO.output(motorPin,GPIO.HIGH)
+    DataRepository.post_new_pump_change(1,7)
+    dataPh = read_sensor(99)
+    lcd20x4.lcd_string("pH:   " + str(dataPh[1]), lcd20x4.LCD_LINE_2)
+    DataRepository.post_new_reading(dataPh,4)
+    dataOrp = read_sensor(98)
+    lcd20x4.lcd_string("ORP:  " + str(dataOrp[1]), lcd20x4.LCD_LINE_3)
+    DataRepository.post_new_reading(dataOrp,5)
+    dataC = read_temperature()
+    lcd20x4.lcd_string("C:    " + str(dataC[1]), lcd20x4.LCD_LINE_4)
+    DataRepository.post_new_reading(dataC,6)
+    GPIO.output(motorPin,GPIO.LOW)
+    DataRepository.post_new_pump_change(0,7)
+
+    socketio.emit('B2F_verandering_data', {"ph":dataPh[1],"orp":dataOrp[1],"degrees":dataC[1]})   
+    time.sleep(time_between_readings)
+
+
+@socketio.on("F2B_ButtonPressed")
+def button_pressed():
+    selc_control()
+
 def programma():
     
     try:
         while True:
-            GPIO.output(motorPin,GPIO.LOW)
-            lcd20x4.I2C_ADDR = lcd_addr
-            lcd20x4.lcd_init()
-            clear_lcd()
-            datum = datetime.now().replace(microsecond=0)
-            GPIO.output(motorPin,GPIO.HIGH)
-            DataRepository.post_new_pump_change(1,7)
-            dataPh = read_sensor(99)
-            lcd20x4.lcd_string("pH:   " + str(dataPh[1]), lcd20x4.LCD_LINE_2)
-            DataRepository.post_new_reading(dataPh,4)
-            dataOrp = read_sensor(98)
-            lcd20x4.lcd_string("ORP:  " + str(dataOrp[1]), lcd20x4.LCD_LINE_3)
-            DataRepository.post_new_reading(dataOrp,5)
-            dataC = read_temperature()
-            lcd20x4.lcd_string("C:    " + str(dataC[1]), lcd20x4.LCD_LINE_4)
-            DataRepository.post_new_reading(dataC,6)
-            GPIO.output(motorPin,GPIO.LOW)
-            DataRepository.post_new_pump_change(0,7)
-            socketio.emit('B2F_verandering_data')   
-            time.sleep(time_between_readings)
+            # pass
+            program_code()
     except:
         clear_lcd()
         lcd20x4.I2C_ADDR = lcd_addr
         lcd20x4.lcd_toggle_enable(0)
         GPIO.cleanup()
 
-threading.Timer(0, programma).start()
+threading.Timer(15, programma).start()
 
 if __name__ == '__main__':
     socketio.run(app, debug=False, host='0.0.0.0',port=5000)
+
     programma()
     
 
